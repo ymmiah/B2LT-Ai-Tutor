@@ -1,0 +1,7 @@
+{
+  "name": "UK Exam Prep AI",
+  "description": "An AI-powered application to help users prepare for the B1 and Life in the UK exams. Features include conversational practice, mock tests, study aid generation, and an intelligent chatbot.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
