@@ -4,7 +4,7 @@ import B1Prep from './components/B1Prep';
 import LifeInUKPrep from './components/LifeInUKPrep';
 import Profile from './components/Profile';
 import LoginScreen from './components/LoginScreen';
-import { HomeIcon, SparklesIcon, UserIcon, AcademicCapIcon, BookOpenIcon, LandmarkIcon } from './components/icons';
+import { HomeIcon, SparklesIcon, UserIcon, AcademicCapIcon, LandmarkIcon } from './components/icons';
 
 const POINTS_PER_LEVEL = 150;
 const POINTS_PER_CORRECT_ANSWER = 10;

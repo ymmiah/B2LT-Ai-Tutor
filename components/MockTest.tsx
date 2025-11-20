@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { generateMockTest, generateDetailedFeedback, translateQuestion, createChat } from '../services/geminiService';
 import { MockQuestion, TestResult, IncorrectQuestionDetail } from '../types';
@@ -421,13 +422,16 @@ const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory
             onClose={() => setIsTutorOpen(false)}
             question={currentQuestion}
         />
-        <div className="mb-4">
-            <div className="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400 mb-2">
-                <button onClick={handleReturnToList} className="hover:underline">Exit Test</button>
-                <span>Question {currentQuestionIndex + 1} of {questions.length}</span>
-            </div>
+        
+        <div className="flex items-center justify-end mb-4">
+            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                Question {currentQuestionIndex + 1} of {questions.length}
+            </span>
+        </div>
+
+        <div className="mb-6">
             <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
-                <div className="bg-indigo-600 h-2 rounded-full" style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}></div>
+                <div className="bg-indigo-600 h-2 rounded-full transition-all duration-300" style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}></div>
             </div>
         </div>
 
@@ -607,7 +611,12 @@ const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory
       return renderExamSelection();
     }
     if (loading) {
-      return <div className="flex justify-center items-center h-64"><Spinner /></div>;
+      return (
+          <div className="flex flex-col justify-center items-center h-64">
+              <Spinner />
+              <p className="mt-4 text-gray-500">Loading Exam...</p>
+          </div>
+      );
     }
     if (error) {
       return (
@@ -628,9 +637,18 @@ const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory
     return null;
   }
 
+  const headerAction = selectedExam !== null ? (
+    <button
+        onClick={handleReturnToList}
+        className="flex items-center text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+    >
+        <ChevronLeftIcon className="h-4 w-4 mr-1" />
+        Back to Exams
+    </button>
+  ) : null;
 
   return (
-    <Card title={`${examType} Mock Test`} icon={<BookOpenIcon />}>
+    <Card title={`${examType} Mock Test`} icon={<BookOpenIcon />} action={headerAction}>
         {renderContent()}
     </Card>
   );
