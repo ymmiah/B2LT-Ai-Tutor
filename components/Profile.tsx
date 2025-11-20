@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from 'react';
+
+import React, { useMemo, useState, useRef } from 'react';
 import { UserProgressData, TestResult, IncorrectQuestionDetail } from '../types';
 import Card from './shared/Card';
-import { UserIcon, BookOpenIcon, StarIcon, TrophyIcon, BadgeCheckIcon, TrendingDownIcon, AcademicCapIcon, LandmarkIcon, LogoutIcon } from './icons';
+import { UserIcon, BookOpenIcon, StarIcon, TrophyIcon, BadgeCheckIcon, TrendingDownIcon, AcademicCapIcon, LandmarkIcon, LogoutIcon, SparklesIcon } from './icons';
+import { storageService } from '../services/storageService';
 
 // --- Chart Components ---
 
@@ -129,6 +131,7 @@ interface ProfileProps {
     userProgress: UserProgressData | null;
     onLogout: () => void;
     pointsPerLevel: number;
+    onImport: (data: UserProgressData) => void;
 }
 
 const iconMap: { [key: string]: React.ElementType } = {
@@ -252,8 +255,57 @@ const PerformanceAnalysis: React.FC<{ testHistory: TestResult[] }> = ({ testHist
     );
 };
 
+const BackupRestore: React.FC<{ userProgress: UserProgressData | null, onImport: (data: UserProgressData) => void }> = ({ userProgress, onImport }) => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
 
-const Profile: React.FC<ProfileProps> = ({ userEmail, userProgress, onLogout, pointsPerLevel }) => {
+    if (!userProgress) return null;
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setMessage(null);
+        try {
+            const data = await storageService.importData(file);
+            if (data.email !== userProgress.email) {
+                if (!confirm(`This backup belongs to ${data.email}. Do you want to restore it and switch to that user?`)) {
+                    // reset
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                    return;
+                }
+            }
+            onImport(data);
+            setMessage({ text: 'Data imported successfully!', type: 'success' });
+        } catch (err) {
+            setMessage({ text: 'Failed to import data. Invalid file format.', type: 'error' });
+        }
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    return (
+        <Card title="Data Backup & Restore" icon={<SparklesIcon />}>
+             <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+                 Keep your history safe! Export your progress to a file or restore from a previous backup. This is useful if you change devices or clear your browser history.
+             </p>
+             <div className="flex space-x-4">
+                 <button onClick={() => storageService.exportData(userProgress)} className="flex-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 font-semibold py-2 px-4 rounded hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors">Export Data</button>
+                 <button onClick={handleImportClick} className="flex-1 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 font-semibold py-2 px-4 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Import Data</button>
+                 <input type="file" hidden ref={fileInputRef} accept=".json" onChange={handleFileChange} />
+             </div>
+             {message && (
+                 <p className={`mt-3 text-sm font-medium ${message.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                     {message.text}
+                 </p>
+             )}
+        </Card>
+    );
+}
+
+const Profile: React.FC<ProfileProps> = ({ userEmail, userProgress, onLogout, pointsPerLevel, onImport }) => {
 
     const sortedHistory = userProgress?.testHistory.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const progressPercentage = userProgress ? Math.round(((userProgress.points % pointsPerLevel) / pointsPerLevel) * 100) : 0;
@@ -326,6 +378,9 @@ const Profile: React.FC<ProfileProps> = ({ userEmail, userProgress, onLogout, po
                            </div>
                         ) : <p>Start a test to see your progress!</p>}
                      </Card>
+                     
+                     <BackupRestore userProgress={userProgress} onImport={onImport} />
+
                      <Card title="Account" icon={<UserIcon />}>
                         <p className="mb-2 text-sm">You are signed in as:</p>
                         <p className="font-semibold text-center bg-gray-100 dark:bg-gray-700 py-2 px-4 rounded-md mb-4 break-all">{userEmail}</p>

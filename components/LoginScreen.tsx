@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { SparklesIcon } from './icons';
+import { storageService } from '../services/storageService';
 
 interface LoginScreenProps {
   onLogin: (email: string) => void;
@@ -8,24 +10,24 @@ interface LoginScreenProps {
 const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [emailInput, setEmailInput] = useState('');
   const [knownUsers, setKnownUsers] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const savedUsers = localStorage.getItem('userEmails');
-    if (savedUsers) {
-      setKnownUsers(JSON.parse(savedUsers));
-    }
+    const loadUsers = async () => {
+        try {
+            const users = await storageService.getUsers();
+            setKnownUsers(users);
+        } catch (e) {
+            console.error("Failed to load users");
+        }
+    };
+    loadUsers();
   }, []);
 
   const handleLogin = (email: string) => {
     const trimmedEmail = email.trim();
     if (!trimmedEmail) return;
-
-    // Add to known users if new
-    if (!knownUsers.includes(trimmedEmail)) {
-      const updatedUsers = [...knownUsers, trimmedEmail];
-      setKnownUsers(updatedUsers);
-      localStorage.setItem('userEmails', JSON.stringify(updatedUsers));
-    }
+    setIsLoading(true);
     onLogin(trimmedEmail);
   };
 
@@ -64,13 +66,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             onKeyPress={(e) => e.key === 'Enter' && handleLogin(emailInput)}
             placeholder="your.email@example.com"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            disabled={isLoading}
           />
           <button
             onClick={() => handleLogin(emailInput)}
-            className="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400 dark:ring-offset-gray-900"
-            disabled={!emailInput.trim()}
+            className="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400 dark:ring-offset-gray-900 flex justify-center"
+            disabled={!emailInput.trim() || isLoading}
           >
-            Continue
+            {isLoading ? 'Loading...' : 'Continue'}
           </button>
         </div>
       </div>

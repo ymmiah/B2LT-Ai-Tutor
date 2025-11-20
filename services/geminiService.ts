@@ -10,18 +10,19 @@ if (!API_KEY) {
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 export const generateMockTest = async (topic: 'B1' | 'Life in the UK', examNumber: number): Promise<GenerateContentResponse> => {
-    // For Life in the UK, try to use a pre-baked exam first for speed.
+    // Use the central question management system for Life in the UK
     if (topic === 'Life in the UK') {
-        const prebakedExam = lifeInUKMockExams[`exam${examNumber}`];
+        // The proxy in data/mockExams.ts handles the slicing logic for any exam number
+        const prebakedExam = (lifeInUKMockExams as any)[`exam${examNumber}`];
         if (prebakedExam) {
-            console.log(`Loading pre-baked Life in the UK Mock Exam #${examNumber}`);
+            console.log(`Loading Central Pool Life in the UK Mock Exam #${examNumber}`);
             return {
                 text: JSON.stringify(prebakedExam)
             } as GenerateContentResponse;
         }
     }
     
-    // For B1, try to use a pre-baked exam first for speed.
+    // For B1, try to use a pre-baked exam first.
     if (topic === 'B1') {
         const prebakedExam = b1MockExams[`exam${examNumber}`];
         if (prebakedExam) {
@@ -32,7 +33,7 @@ export const generateMockTest = async (topic: 'B1' | 'Life in the UK', examNumbe
         }
     }
 
-    // Fallback to AI generation if no pre-baked exam is found or for other topics.
+    // Fallback to AI generation if absolutely necessary (shouldn't happen for Life in UK 1-20)
     console.log(`Generating AI Mock Exam for ${topic}, #${examNumber}`);
     const questionCount = 24;
     let prompt = `Generate a ${questionCount}-question multiple choice mock test for the ${topic} exam, specifically for Mock Exam #${examNumber}. Ensure the questions are relevant and cover different aspects of the exam. Provide one correct answer and three incorrect options for each question, along with a brief explanation for the correct answer.`;
@@ -177,4 +178,15 @@ export const generateSpeech = async (text: string): Promise<GenerateContentRespo
             },
         },
     });
+};
+
+export const generateHint = async (question: string, correctAnswer: string): Promise<string> => {
+    const prompt = `The student is stuck on this question: "${question}". The correct answer is "${correctAnswer}". Give a cryptic, mysterious, but helpful hint that points them in the right direction without revealing the answer directly. The hint should be short (one sentence) and clever.`;
+
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash-lite",
+        contents: prompt,
+    });
+    
+    return response.text || "Think carefully about the history...";
 };

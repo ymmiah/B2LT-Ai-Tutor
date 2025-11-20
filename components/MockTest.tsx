@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { generateMockTest, generateDetailedFeedback, translateQuestion, createChat } from '../services/geminiService';
+import { generateMockTest, generateDetailedFeedback, translateQuestion, createChat, generateHint } from '../services/geminiService';
 import { MockQuestion, TestResult, IncorrectQuestionDetail } from '../types';
 import Card from './shared/Card';
 import Spinner from './shared/Spinner';
-import { SparklesIcon, SoundOnIcon, AcademicCapIcon, LanguageIcon, SendIcon, CheckCircleIcon, XCircleIcon, ChevronLeftIcon, ChevronRightIcon, BookOpenIcon, TrophyIcon } from './icons';
+import { SparklesIcon, SoundOnIcon, AcademicCapIcon, LanguageIcon, SendIcon, CheckCircleIcon, XCircleIcon, ChevronLeftIcon, ChevronRightIcon, BookOpenIcon, TrophyIcon, SunIcon } from './icons'; // Assuming SunIcon or similar can be used for hint, or reuse Sparkles
 import { generateSpeech } from '../services/geminiService';
 import { decode, decodeAudioData } from '../utils/audioUtils';
 import { Chat } from '@google/genai';
@@ -163,6 +163,9 @@ const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory
   const [isTranslated, setIsTranslated] = useState(false);
   const [translationLoading, setTranslationLoading] = useState(false);
   const [translationError, setTranslationError] = useState('');
+  
+  const [hint, setHint] = useState<string | null>(null);
+  const [isHintLoading, setIsHintLoading] = useState(false);
 
 
   const examOptions = Array.from({ length: 20 }, (_, i) => i + 1);
@@ -180,6 +183,8 @@ const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory
     setIsTranslated(false);
     setTranslationError('');
     setTranslationLoading(false);
+    setHint(null);
+    setIsHintLoading(false);
   };
 
   const handleSelectExam = async (examNumber: number) => {
@@ -227,6 +232,7 @@ const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory
     setTranslatedQuestion(null);
     setIsTranslated(false);
     setTranslationError('');
+    setHint(null);
 
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -240,10 +246,27 @@ const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory
     setTranslatedQuestion(null);
     setIsTranslated(false);
     setTranslationError('');
+    setHint(null);
 
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     }
+  };
+  
+  const handleGetHint = async () => {
+      if (hint || isHintLoading) return;
+      
+      const currentQuestion = questions[currentQuestionIndex];
+      setIsHintLoading(true);
+      try {
+          const hintText = await generateHint(currentQuestion.question, currentQuestion.correct_answer);
+          setHint(hintText);
+      } catch (error) {
+          console.error("Failed to get hint", error);
+          setHint("Sorry, I couldn't find a hint for this one.");
+      } finally {
+          setIsHintLoading(false);
+      }
   };
   
   const handleSubmit = async () => {
@@ -435,10 +458,26 @@ const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory
             </div>
         </div>
 
-        <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg min-h-[12rem] flex flex-col justify-center">
+        <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg min-h-[12rem] flex flex-col justify-center relative">
+             {/* Hint Section */}
+             {hint && (
+                <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-400 text-yellow-800 dark:text-yellow-200 text-sm rounded animate-fadeIn">
+                    <strong className="font-bold">Hint:</strong> {hint}
+                </div>
+            )}
+            
             <div className="flex items-start space-x-2">
                 <h4 className="text-xl font-semibold mb-4 flex-grow">{displayQuestion}</h4>
                 <div className="flex-shrink-0 flex items-center space-x-1">
+                     <button 
+                        onClick={handleGetHint} 
+                        disabled={!!hint || isHintLoading}
+                        className="p-2 rounded-full text-yellow-500 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 disabled:opacity-50"
+                        aria-label="Get a hint"
+                        title="Get a cryptic hint"
+                    >
+                      {isHintLoading ? <Spinner /> : <SparklesIcon className="h-5 w-5" />}
+                    </button>
                     <button 
                       onClick={() => handleSpeak(displayQuestion)} 
                       disabled={isSpeaking}

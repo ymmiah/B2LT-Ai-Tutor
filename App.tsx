@@ -1,73 +1,40 @@
+
 import React, { useState, useEffect } from 'react';
-import { Page, TestResult, UserProgressData, Achievement } from './types';
+import { Page, TestResult, UserProgressData } from './types';
 import B1Prep from './components/B1Prep';
 import LifeInUKPrep from './components/LifeInUKPrep';
 import Profile from './components/Profile';
 import LoginScreen from './components/LoginScreen';
 import { HomeIcon, SparklesIcon, UserIcon, AcademicCapIcon, LandmarkIcon } from './components/icons';
-
-const POINTS_PER_LEVEL = 150;
-const POINTS_PER_CORRECT_ANSWER = 10;
-
-const getInitialAchievements = (): Achievement[] => [
-    { id: 'first_test', name: 'First Step', description: 'Complete your first mock test.', unlocked: false, icon: 'BookOpenIcon' },
-    { id: 'perfect_score', name: 'Perfectionist', description: 'Get a perfect score on any mock test.', unlocked: false, icon: 'StarIcon' },
-    { id: 'high_achiever', name: 'High Achiever', description: 'Score 90% or higher on a mock test.', unlocked: false, icon: 'TrophyIcon' },
-    { id: 'b1_starter', name: 'B1 Starter', description: 'Complete one B1 mock test.', unlocked: false, icon: 'BadgeCheckIcon' },
-    { id: 'uk_starter', name: 'UK Starter', description: 'Complete one Life in the UK mock test.', unlocked: false, icon: 'BadgeCheckIcon' },
-    { id: 'five_tests', name: 'Consistent Learner', description: 'Complete 5 mock tests.', unlocked: false, icon: 'BookOpenIcon' },
-    { id: 'ten_tests', name: 'Dedicated Student', description: 'Complete 10 mock tests.', unlocked: false, icon: 'TrophyIcon' },
-];
-
+import { storageService } from './services/storageService';
+import { calculateNewProgress, POINTS_PER_LEVEL } from './utils/progressUtils';
+import Spinner from './components/shared/Spinner';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.Home);
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [userProgress, setUserProgress] = useState<UserProgressData | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    const lastUser = localStorage.getItem('lastUser') || localStorage.getItem('userEmail');
+    const lastUser = localStorage.getItem('lastUser');
     if (lastUser) {
       handleLogin(lastUser);
     }
   }, []);
   
-  const upgradeProgressData = (progress: any): UserProgressData => {
-      let points = progress.points || 0;
-      let achievements = progress.achievements || getInitialAchievements();
-      const testHistory: TestResult[] = progress.testHistory || [];
-
-      // If points were not previously tracked, calculate them.
-      if (progress.points === undefined) {
-        testHistory.forEach(result => {
-            points += result.score * POINTS_PER_CORRECT_ANSWER;
-            achievements = checkAchievements(achievements, testHistory, result);
-        });
-      }
-      
-      // Ensure backward compatibility for incorrectQuestions
-      testHistory.forEach(result => {
-        if (!result.incorrectQuestions) {
-          result.incorrectQuestions = [];
-        }
-      });
-      
-      const level = Math.floor(points / POINTS_PER_LEVEL) + 1;
-
-      return {
-          email: progress.email,
-          testHistory: testHistory,
-          points,
-          level,
-          achievements,
-      };
-  };
-
-  const handleLogin = (email: string) => {
-    setCurrentUserEmail(email);
-    localStorage.setItem('lastUser', email);
-    localStorage.removeItem('userEmail'); // Clean up old key
-    handleLoadProgress(email);
+  const handleLogin = async (email: string) => {
+    setIsLoading(true);
+    try {
+        const progress = await storageService.loadProgress(email);
+        setCurrentUserEmail(email);
+        setUserProgress(progress);
+        localStorage.setItem('lastUser', email);
+    } catch (error) {
+        console.error("Login failed", error);
+    } finally {
+        setIsLoading(false);
+    }
   };
   
   const handleLogout = () => {
@@ -77,71 +44,53 @@ const App: React.FC = () => {
     localStorage.removeItem('lastUser');
   };
 
-  const handleSaveProgress = (progress: UserProgressData) => {
-    if (!currentUserEmail) return;
-    localStorage.setItem(`progress_${currentUserEmail}`, JSON.stringify(progress));
-    setUserProgress(progress);
-  };
-
-  const handleLoadProgress = (email: string) => {
-    const savedProgress = localStorage.getItem(`progress_${email}`);
-    if (savedProgress) {
-      let progressData = JSON.parse(savedProgress);
-      progressData = upgradeProgressData(progressData);
-      setUserProgress(progressData);
-    } else {
-        const newUserProgress: UserProgressData = { 
-            email: email, 
-            testHistory: [],
-            points: 0,
-            level: 1,
-            achievements: getInitialAchievements()
-        };
-        setUserProgress(newUserProgress);
-        localStorage.setItem(`progress_${email}`, JSON.stringify(newUserProgress));
-    }
-  };
-  
-  const checkAchievements = (currentAchievements: Achievement[], history: TestResult[], newResult: TestResult): Achievement[] => {
-      const updatedAchievements = [...currentAchievements];
-      const now = new Date().toISOString();
-
-      const unlock = (id: string) => {
-          const achievement = updatedAchievements.find(a => a.id === id);
-          if (achievement && !achievement.unlocked) {
-              achievement.unlocked = true;
-              achievement.dateUnlocked = now;
-          }
-      };
-      
-      if (history.length >= 1) unlock('first_test');
-      if (newResult.score === newResult.totalQuestions) unlock('perfect_score');
-      if (newResult.score / newResult.totalQuestions >= 0.9) unlock('high_achiever');
-      if (history.filter(t => t.examType === 'B1').length >= 1) unlock('b1_starter');
-      if (history.filter(t => t.examType === 'Life in the UK').length >= 1) unlock('uk_starter');
-      if (history.length >= 5) unlock('five_tests');
-      if (history.length >= 10) unlock('ten_tests');
-      
-      return updatedAchievements;
-  }
-  
-  const handleSaveResult = (result: TestResult) => {
+  const handleSaveResult = async (result: TestResult) => {
       if (!currentUserEmail || !userProgress) return;
 
-      const newHistory = [...userProgress.testHistory, result];
-      const pointsGained = result.score * POINTS_PER_CORRECT_ANSWER;
-      const newTotalPoints = userProgress.points + pointsGained;
-      const newLevel = Math.floor(newTotalPoints / POINTS_PER_LEVEL) + 1;
-      const newAchievements = checkAchievements(userProgress.achievements, newHistory, result);
+      const updatedProgress = calculateNewProgress(userProgress, result);
+      
+      // Optimistic update
+      setUserProgress(updatedProgress);
 
-      const updatedProgress: UserProgressData = {
-          ...userProgress,
-          testHistory: newHistory,
-          points: newTotalPoints,
-          level: newLevel,
-          achievements: newAchievements,
-      };
-      handleSaveProgress(updatedProgress);
+      // Persist to "Backend"
+      try {
+        await storageService.saveProgress(updatedProgress);
+      } catch (error) {
+          console.error("Failed to save progress", error);
+          // Optionally revert optimistic update or show toast error
+      }
+  };
+  
+  const handleImportProgress = async (data: UserProgressData) => {
+      // When importing, we save immediately and update state
+      setIsLoading(true);
+      try {
+          await storageService.saveProgress(data);
+          // If the imported data is for the current user, update state
+          if (data.email === currentUserEmail) {
+              setUserProgress(data);
+          } else {
+              // Switch user to the imported one
+              setCurrentUserEmail(data.email);
+              setUserProgress(data);
+              localStorage.setItem('lastUser', data.email);
+          }
+      } catch (error) {
+          console.error("Import failed", error);
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
+  if (isLoading && !userProgress && !currentUserEmail) {
+      return (
+          <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex items-center justify-center">
+              <div className="text-center">
+                  <Spinner />
+                  <p className="mt-4 text-gray-600 dark:text-gray-400">Connecting to storage...</p>
+              </div>
+          </div>
+      );
   }
   
   if (!currentUserEmail) {
@@ -160,6 +109,7 @@ const App: React.FC = () => {
                   userProgress={userProgress} 
                   onLogout={handleLogout}
                   pointsPerLevel={POINTS_PER_LEVEL}
+                  onImport={handleImportProgress}
                 />;
       default:
         return <HomePage setCurrentPage={setCurrentPage} userProgress={userProgress} pointsPerLevel={POINTS_PER_LEVEL} />;
@@ -215,13 +165,18 @@ const App: React.FC = () => {
              </div>
           </header>
 
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-20 md:pb-8">
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-20 md:pb-8 relative">
+            {isLoading && (
+                <div className="absolute inset-0 bg-white/50 dark:bg-black/50 z-50 flex items-center justify-center">
+                    <Spinner />
+                </div>
+            )}
             {renderPage()}
           </main>
       </div>
       
        {/* Bottom Nav for mobile */}
-       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-around">
+       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-around z-40">
             {allNavItems.filter(item => item.page !== Page.Profile).map(item => (
                 <a href="#" key={item.label} onClick={(e) => { e.preventDefault(); setCurrentPage(item.page); }}
                     className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors duration-200 ${currentPage === item.page ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
