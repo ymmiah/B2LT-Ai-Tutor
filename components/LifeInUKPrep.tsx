@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import MockTest from './MockTest';
 import Card from './shared/Card';
@@ -5,7 +6,7 @@ import Spinner from './shared/Spinner';
 import { generateImage } from '../services/geminiService';
 import Chatbot from './Chatbot';
 import { SparklesIcon } from './icons';
-import { TestResult } from '../types';
+import { TestResult, SavedQuestion } from '../types';
 
 const StudyAidGenerator: React.FC = () => {
     const [prompt, setPrompt] = useState('');
@@ -84,16 +85,24 @@ const StudyAidGenerator: React.FC = () => {
 interface LifeInUKPrepProps {
     onSaveResult: (result: TestResult) => void;
     testHistory: TestResult[];
+    favorites: SavedQuestion[];
+    onToggleFavorite: (q: SavedQuestion) => void;
 }
 
-const LifeInUKPrep: React.FC<LifeInUKPrepProps> = ({ onSaveResult, testHistory }) => {
+const LifeInUKPrep: React.FC<LifeInUKPrepProps> = ({ onSaveResult, testHistory, favorites, onToggleFavorite }) => {
   return (
     <div className="space-y-8">
         <div>
             <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white">Life in the UK Test Preparation</h2>
             <p className="mt-2 text-lg text-gray-600 dark:text-gray-400">Master the official handbook with our interactive tools.</p>
         </div>
-      <MockTest examType="Life in the UK" onSaveResult={onSaveResult} testHistory={testHistory} />
+      <MockTest 
+        examType="Life in the UK" 
+        onSaveResult={onSaveResult} 
+        testHistory={testHistory} 
+        favorites={favorites}
+        onToggleFavorite={onToggleFavorite}
+      />
       <StudyAidGenerator />
       <Chatbot systemInstruction="You are an expert tutor for the Life in the UK test. Answer questions clearly and concisely. You can use Google Search and Maps to find up-to-date information on test centers or related topics if asked." />
     </div>

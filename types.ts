@@ -25,6 +25,17 @@ export interface IncorrectQuestionDetail {
     correctAnswer: string;
 }
 
+export interface SavedQuestion {
+  id: string; // Unique identifier (hash or timestamp + index)
+  section: 'B1' | 'Life in the UK';
+  question: string;
+  options: string[];
+  correctAnswer: string;
+  explanation: string;
+  context?: string; // For Reading passages or Listening scripts
+  dateSaved: string;
+}
+
 export interface TestResult {
   examType: 'B1' | 'Life in the UK';
   examNumber: number;
@@ -49,4 +60,5 @@ export interface UserProgressData {
   points: number;
   level: number;
   achievements: Achievement[];
+  favorites: SavedQuestion[];
 }

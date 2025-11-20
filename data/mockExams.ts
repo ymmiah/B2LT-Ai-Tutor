@@ -1,10 +1,28 @@
 
 import { MockQuestion } from "../types";
 import { masterQuestionPool } from './lifeInUK/masterPool';
-import { b1MockExams as originalB1 } from './mockExams'; // We will keep B1 as is for now, or I can inline it if needed. 
-// Actually, I'll just redefine B1 here to keep the file self-contained and clean, avoiding circular deps if I import from itself (which is bad).
+import { exam1 } from './lifeInUK/exam1';
+import { exam2 } from './lifeInUK/exam2';
+import { exam3 } from './lifeInUK/exam3';
+import { exam4 } from './lifeInUK/exam4';
+import { exam5 } from './lifeInUK/exam5';
+import { exam6 } from './lifeInUK/exam6';
+import { exam7 } from './lifeInUK/exam7';
+import { exam8 } from './lifeInUK/exam8';
+import { exam9 } from './lifeInUK/exam9';
+import { exam10 } from './lifeInUK/exam10';
+import { exam11 } from './lifeInUK/exam11';
+import { exam12 } from './lifeInUK/exam12';
+import { exam13 } from './lifeInUK/exam13';
+import { exam14 } from './lifeInUK/exam14';
+import { exam15 } from './lifeInUK/exam15';
+import { exam16 } from './lifeInUK/exam16';
+import { exam17 } from './lifeInUK/exam17';
+import { exam18 } from './lifeInUK/exam18';
+import { exam19 } from './lifeInUK/exam19';
+import { exam20 } from './lifeInUK/exam20';
 
-// --- B1 Exam Data (Preserved) ---
+// --- B1 Exam Data ---
 const b1ExamData: { [key: string]: { questions: MockQuestion[] } } = {
   exam1: {
     questions: [
@@ -43,9 +61,6 @@ export const b1MockExams = b1ExamData;
 
 const QUESTIONS_PER_EXAM = 24;
 
-// Helper function to deterministically get a unique slice of questions for any exam number.
-// This ensures Exams 1-20 are always unique (as long as the pool is big enough).
-// If the pool runs out, it wraps around using modulo, but with an offset to try and mix it up.
 const getLifeInUKQuestions = (examNumber: number): MockQuestion[] => {
     const totalQuestions = masterQuestionPool.length;
     const startIndex = ((examNumber - 1) * QUESTIONS_PER_EXAM) % totalQuestions;
@@ -53,22 +68,23 @@ const getLifeInUKQuestions = (examNumber: number): MockQuestion[] => {
     let questions: MockQuestion[] = [];
     
     if (startIndex + QUESTIONS_PER_EXAM <= totalQuestions) {
-        // Simple slice if we have enough questions remaining in the array
         questions = masterQuestionPool.slice(startIndex, startIndex + QUESTIONS_PER_EXAM);
     } else {
-        // Wrap around if we reach the end
         const firstPart = masterQuestionPool.slice(startIndex);
         const remainingCount = QUESTIONS_PER_EXAM - firstPart.length;
         const secondPart = masterQuestionPool.slice(0, remainingCount);
         questions = [...firstPart, ...secondPart];
     }
-    
-    // Add a generated exam number property if needed, or just return the raw questions.
-    // The UI expects just the questions array.
     return questions;
 };
 
-// Using a Proxy to dynamically handle any exam number request (exam1...exam20...)
+const staticExams: { [key: number]: { questions: MockQuestion[] } } = {
+    1: exam1, 2: exam2, 3: exam3, 4: exam4, 5: exam5,
+    6: exam6, 7: exam7, 8: exam8, 9: exam9, 10: exam10,
+    11: exam11, 12: exam12, 13: exam13, 14: exam14, 15: exam15,
+    16: exam16, 17: exam17, 18: exam18, 19: exam19, 20: exam20
+};
+
 export const lifeInUKMockExams = new Proxy({}, {
   get: (target, prop: string) => {
     if (prop.startsWith('exam')) {
@@ -76,6 +92,11 @@ export const lifeInUKMockExams = new Proxy({}, {
         const examNumber = parseInt(examNumberStr, 10);
         
         if (!isNaN(examNumber)) {
+            // Prefer static file if available
+            if (staticExams[examNumber]) {
+                return staticExams[examNumber];
+            }
+            // Fallback to master pool generator
             return { questions: getLifeInUKQuestions(examNumber) };
         }
     }

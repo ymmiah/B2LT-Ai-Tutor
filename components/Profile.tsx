@@ -1,8 +1,8 @@
 
 import React, { useMemo, useState, useRef } from 'react';
-import { UserProgressData, TestResult, IncorrectQuestionDetail } from '../types';
+import { UserProgressData, TestResult, IncorrectQuestionDetail, SavedQuestion } from '../types';
 import Card from './shared/Card';
-import { UserIcon, BookOpenIcon, StarIcon, TrophyIcon, BadgeCheckIcon, TrendingDownIcon, AcademicCapIcon, LandmarkIcon, LogoutIcon, SparklesIcon } from './icons';
+import { UserIcon, BookOpenIcon, StarIcon, TrophyIcon, BadgeCheckIcon, TrendingDownIcon, AcademicCapIcon, LandmarkIcon, LogoutIcon, SparklesIcon, HeartIcon, ChevronRightIcon } from './icons';
 import { storageService } from '../services/storageService';
 
 // --- Chart Components ---
@@ -132,6 +132,7 @@ interface ProfileProps {
     onLogout: () => void;
     pointsPerLevel: number;
     onImport: (data: UserProgressData) => void;
+    onToggleFavorite: (q: SavedQuestion) => void;
 }
 
 const iconMap: { [key: string]: React.ElementType } = {
@@ -255,6 +256,66 @@ const PerformanceAnalysis: React.FC<{ testHistory: TestResult[] }> = ({ testHist
     );
 };
 
+const FavoritesList: React.FC<{ favorites: SavedQuestion[], onRemove: (q: SavedQuestion) => void }> = ({ favorites, onRemove }) => {
+    const [openId, setOpenId] = useState<string | null>(null);
+
+    if (favorites.length === 0) return null;
+
+    return (
+        <Card title="Saved Questions" icon={<HeartIcon className="text-red-500" />}>
+            <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                {favorites.map((item, idx) => {
+                    const isOpen = openId === item.question; // using question string as ID since it's unique enough here
+                    return (
+                        <div key={idx} className="bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                            <div className="p-4 cursor-pointer flex justify-between items-center" onClick={() => setOpenId(isOpen ? null : item.question)}>
+                                <div>
+                                    <div className="flex items-center space-x-2 mb-1">
+                                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${item.section === 'B1' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' : 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200'}`}>
+                                            {item.section}
+                                        </span>
+                                        <span className="text-xs text-gray-500">{new Date(item.dateSaved).toLocaleDateString()}</span>
+                                    </div>
+                                    <p className="font-medium text-gray-800 dark:text-gray-200 line-clamp-2">{item.question}</p>
+                                </div>
+                                <div className="flex items-center space-x-3">
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); onRemove(item); }} 
+                                        className="p-1 text-red-500 hover:bg-red-100 rounded-full"
+                                        title="Remove from favorites"
+                                    >
+                                        <HeartIcon className="h-5 w-5 fill-current" />
+                                    </button>
+                                    <ChevronRightIcon className={`h-5 w-5 text-gray-400 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                                </div>
+                            </div>
+                            {isOpen && (
+                                <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                                    {item.context && (
+                                        <div className="mb-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 text-sm text-gray-600 dark:text-gray-400 rounded italic">
+                                            <strong>Context:</strong> {item.context}
+                                        </div>
+                                    )}
+                                    <div className="space-y-2 mb-4">
+                                        {item.options.map((opt, i) => (
+                                            <div key={i} className={`p-2 rounded border ${opt === item.correctAnswer ? 'bg-green-50 border-green-500 text-green-800 dark:bg-green-900/30 dark:text-green-200' : 'border-gray-200 dark:border-gray-700'}`}>
+                                                {opt} {opt === item.correctAnswer && <span className="float-right font-bold text-green-600">✓</span>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-700 text-sm">
+                                        <strong>Explanation:</strong> {item.explanation}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        </Card>
+    );
+};
+
 const BackupRestore: React.FC<{ userProgress: UserProgressData | null, onImport: (data: UserProgressData) => void }> = ({ userProgress, onImport }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
@@ -305,7 +366,7 @@ const BackupRestore: React.FC<{ userProgress: UserProgressData | null, onImport:
     );
 }
 
-const Profile: React.FC<ProfileProps> = ({ userEmail, userProgress, onLogout, pointsPerLevel, onImport }) => {
+const Profile: React.FC<ProfileProps> = ({ userEmail, userProgress, onLogout, pointsPerLevel, onImport, onToggleFavorite }) => {
 
     const sortedHistory = userProgress?.testHistory.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const progressPercentage = userProgress ? Math.round(((userProgress.points % pointsPerLevel) / pointsPerLevel) * 100) : 0;
@@ -324,6 +385,11 @@ const Profile: React.FC<ProfileProps> = ({ userEmail, userProgress, onLogout, po
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-8">
                      {userProgress && <PerformanceAnalysis testHistory={userProgress.testHistory} />}
+                     
+                     {userProgress && userProgress.favorites && userProgress.favorites.length > 0 && (
+                         <FavoritesList favorites={userProgress.favorites} onRemove={onToggleFavorite} />
+                     )}
+
                     <Card title="Achievements">
                         {userProgress && userProgress.achievements.length > 0 ? (
                             <div>

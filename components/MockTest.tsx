@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { generateMockTest, generateDetailedFeedback, translateQuestion, createChat, generateHint } from '../services/geminiService';
-import { MockQuestion, TestResult, IncorrectQuestionDetail } from '../types';
+import { MockQuestion, TestResult, IncorrectQuestionDetail, SavedQuestion } from '../types';
 import Card from './shared/Card';
 import Spinner from './shared/Spinner';
-import { SparklesIcon, SoundOnIcon, AcademicCapIcon, LanguageIcon, SendIcon, CheckCircleIcon, XCircleIcon, ChevronLeftIcon, ChevronRightIcon, BookOpenIcon, TrophyIcon, SunIcon } from './icons'; // Assuming SunIcon or similar can be used for hint, or reuse Sparkles
+import { SparklesIcon, SoundOnIcon, AcademicCapIcon, LanguageIcon, SendIcon, CheckCircleIcon, XCircleIcon, ChevronLeftIcon, ChevronRightIcon, BookOpenIcon, TrophyIcon, SunIcon, HeartIcon } from './icons';
 import { generateSpeech } from '../services/geminiService';
 import { decode, decodeAudioData } from '../utils/audioUtils';
 import { Chat } from '@google/genai';
@@ -141,9 +141,11 @@ interface MockTestProps {
   examType: 'B1' | 'Life in the UK';
   onSaveResult: (result: TestResult) => void;
   testHistory: TestResult[];
+  favorites?: SavedQuestion[];
+  onToggleFavorite?: (q: SavedQuestion) => void;
 }
 
-const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory }) => {
+const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory, favorites = [], onToggleFavorite }) => {
   const [questions, setQuestions] = useState<MockQuestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -167,8 +169,18 @@ const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory
   const [hint, setHint] = useState<string | null>(null);
   const [isHintLoading, setIsHintLoading] = useState(false);
 
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   const examOptions = Array.from({ length: 20 }, (_, i) => i + 1);
+
+  useEffect(() => {
+      // Clean up audio context on unmount
+      return () => {
+          if (audioCtxRef.current) {
+              audioCtxRef.current.close();
+          }
+      }
+  }, []);
 
   const resetTestState = () => {
     setQuestions([]);
@@ -194,7 +206,10 @@ const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory
     try {
       const response = await generateMockTest(examType, examNumber);
       const jsonStr = response.text.trim();
-      const data = JSON.parse(jsonStr);
+      // Handle potential markdown code block wrapper
+      const cleanJson = jsonStr.replace(/```json\s*|\s*```/g, '');
+      const data = JSON.parse(cleanJson);
+      
       if (data.questions && data.questions.length > 0) {
         setQuestions(data.questions);
       } else {
@@ -326,16 +341,26 @@ const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory
     if (isSpeaking) return;
     setIsSpeaking(true);
     setSpeakingFor(text);
+    
     try {
       const textToSpeak = text.replace(/______/g, 'dash');
       const response = await generateSpeech(textToSpeak);
       const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      
       if (base64Audio) {
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-        const audioBuffer = await decodeAudioData(decode(base64Audio), audioContext, 24000, 1);
-        const source = audioContext.createBufferSource();
+        // Init context if not already done
+        if (!audioCtxRef.current) {
+             audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        }
+        
+        if (audioCtxRef.current.state === 'suspended') {
+             await audioCtxRef.current.resume();
+        }
+
+        const audioBuffer = await decodeAudioData(decode(base64Audio), audioCtxRef.current, 24000, 1);
+        const source = audioCtxRef.current.createBufferSource();
         source.buffer = audioBuffer;
-        source.connect(audioContext.destination);
+        source.connect(audioCtxRef.current.destination);
         source.start();
         source.onended = () => {
             setIsSpeaking(false);
@@ -375,7 +400,7 @@ const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory
       setTranslationLoading(true);
       try {
           const response = await translateQuestion(currentQuestion, 'Bengali');
-          const data = JSON.parse(response.text);
+          const data = JSON.parse(response.text.replace(/```json\s*|\s*```/g, ''));
           setTranslatedQuestion(data);
           setIsTranslated(true);
       } catch (err) {
@@ -437,7 +462,8 @@ const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory
     const currentQuestion = questions[currentQuestionIndex];
     const displayQuestion = (isTranslated && translatedQuestion) ? translatedQuestion.question : currentQuestion.question;
     const displayOptions = (isTranslated && translatedQuestion) ? translatedQuestion.options : currentQuestion.options;
-    
+    const isFavorited = favorites.some(fav => fav.question === currentQuestion.question);
+
     return (
       <div>
         <TutorModal 
@@ -459,6 +485,25 @@ const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory
         </div>
 
         <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg min-h-[12rem] flex flex-col justify-center relative">
+             {/* Favorite Toggle */}
+             {onToggleFavorite && (
+                <button 
+                    onClick={() => onToggleFavorite({
+                        id: btoa(currentQuestion.question), // simple ID generation
+                        section: 'Life in the UK',
+                        question: currentQuestion.question,
+                        options: currentQuestion.options,
+                        correctAnswer: currentQuestion.correct_answer,
+                        explanation: currentQuestion.explanation,
+                        dateSaved: new Date().toISOString()
+                    })}
+                    className="absolute top-4 right-4 text-gray-400 hover:text-red-500"
+                    title="Save Question"
+                >
+                    <HeartIcon className={`h-6 w-6 ${isFavorited ? 'fill-red-500 text-red-500' : ''}`} />
+                </button>
+            )}
+
              {/* Hint Section */}
              {hint && (
                 <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-400 text-yellow-800 dark:text-yellow-200 text-sm rounded animate-fadeIn">
@@ -489,10 +534,10 @@ const MockTest: React.FC<MockTestProps> = ({ examType, onSaveResult, testHistory
                     <button
                         onClick={handleTranslate}
                         disabled={translationLoading}
-                        className="p-2 rounded-full text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50"
+                        className={`p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 ${isTranslated ? 'text-indigo-600' : 'text-gray-500'}`}
                         aria-label={isTranslated ? "Show original language" : "Translate to Bangla"}
                     >
-                       <LanguageIcon className="h-5 w-5"/>
+                       {translationLoading ? <Spinner/> : <LanguageIcon className="h-5 w-5"/>}
                     </button>
                      <button 
                         onClick={() => setIsTutorOpen(true)}

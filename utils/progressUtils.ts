@@ -46,6 +46,7 @@ export const upgradeProgressData = (progress: any): UserProgressData => {
       let points = progress.points || 0;
       let achievements = progress.achievements || getInitialAchievements();
       const testHistory: TestResult[] = progress.testHistory || [];
+      const favorites = progress.favorites || [];
 
       // If points were not previously tracked, calculate them based on history
       if (progress.points === undefined && testHistory.length > 0) {
@@ -79,6 +80,7 @@ export const upgradeProgressData = (progress: any): UserProgressData => {
           points,
           level,
           achievements,
+          favorites
       };
 };
 
@@ -95,5 +97,6 @@ export const calculateNewProgress = (currentProgress: UserProgressData, result: 
           points: newTotalPoints,
           level: newLevel,
           achievements: newAchievements,
+          favorites: currentProgress.favorites || []
       };
 };

@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, GenerateContentResponse, Chat } from "@google/genai";
 import { lifeInUKMockExams, b1MockExams } from '../data/mockExams';
 import { MockQuestion } from "../types";
@@ -8,6 +9,8 @@ if (!API_KEY) {
 }
 
 const ai = new GoogleGenAI({ apiKey: API_KEY });
+
+// --- Existing Mock Test Functions ---
 
 export const generateMockTest = async (topic: 'B1' | 'Life in the UK', examNumber: number): Promise<GenerateContentResponse> => {
     // Use the central question management system for Life in the UK
@@ -143,6 +146,28 @@ export const translateQuestion = async (question: MockQuestion, targetLanguage: 
     });
 };
 
+// Generic Text Translator for "All over the place" translation
+export const translateContent = async (content: string | object, targetLanguage: string = 'Bengali') => {
+    const contentString = typeof content === 'string' ? content : JSON.stringify(content);
+    const isJson = typeof content !== 'string';
+
+    let prompt = `Translate the following text into ${targetLanguage}. Maintain the original formatting (Markdown, HTML, etc.).`;
+    
+    if (isJson) {
+        prompt = `Translate all readable values in this JSON object into ${targetLanguage}. Keep the keys and structure exactly the same. Return ONLY valid JSON.`;
+    }
+
+    const res = await ai.models.generateContent({
+        model: "gemini-2.5-flash-lite",
+        contents: prompt + "\n\n" + contentString,
+        config: {
+            responseMimeType: isJson ? "application/json" : "text/plain"
+        }
+    });
+    
+    return res.text;
+};
+
 
 export const createChat = (systemInstruction: string): Chat => {
     return ai.chats.create({
@@ -189,4 +214,133 @@ export const generateHint = async (question: string, correctAnswer: string): Pro
     });
     
     return response.text || "Think carefully about the history...";
+};
+
+// --- NEW B1 MODULE FUNCTIONS ---
+
+export const generateB1Reading = async () => {
+    const prompt = `Generate a B1 CEFR level reading comprehension exercise. 
+    1. Create a reading passage of about 150-200 words on a general topic (travel, work, hobbies, daily life).
+    2. Provide 3-5 multiple choice comprehension questions based on the text.
+    
+    Format as JSON.`;
+
+    return ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    title: { type: Type.STRING },
+                    passage: { type: Type.STRING },
+                    questions: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                question: { type: Type.STRING },
+                                options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                answer: { type: Type.STRING } // The correct option string
+                            },
+                            required: ["question", "options", "answer"]
+                        }
+                    }
+                },
+                required: ["title", "passage", "questions"]
+            }
+        }
+    });
+};
+
+export const generateB1Listening = async () => {
+    const prompt = `Generate a B1 CEFR level listening comprehension exercise script.
+    1. Create a short dialogue or announcement script (100-150 words).
+    2. Provide 3 multiple choice questions based on this script.
+    
+    Format as JSON.`;
+
+    return ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    script: { type: Type.STRING },
+                    questions: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                question: { type: Type.STRING },
+                                options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                answer: { type: Type.STRING }
+                            },
+                            required: ["question", "options", "answer"]
+                        }
+                    }
+                },
+                required: ["script", "questions"]
+            }
+        }
+    });
+};
+
+export const generateB1WritingPrompt = async () => {
+    const prompt = `Generate a B1 CEFR level writing task prompt. It should be either an email to a friend, a short article, or a formal letter. Provide instructions on what to include (approx 100 words). Return ONLY the prompt text.`;
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+    });
+    return response.text;
+};
+
+export const evaluateB1Writing = async (promptText: string, userResponse: string) => {
+    const prompt = `Evaluate the following B1 level writing response based on the prompt.
+    
+    Prompt: "${promptText}"
+    
+    Student Response: "${userResponse}"
+    
+    Provide:
+    1. A numerical score out of 10.
+    2. Feedback including corrections and tips, formatted as an HTML string.
+    `;
+
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash-lite",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    score: { type: Type.NUMBER },
+                    feedback: { type: Type.STRING }
+                },
+                required: ["score", "feedback"]
+            }
+        }
+    });
+    return response.text;
+};
+
+export const generateStudyPlan = async (assessment: any) => {
+    const prompt = `Create a 7-day personalized study plan for a student preparing for the B1 English exam.
+    The student's self-assessment (1-5 scale, 5 being best) is:
+    - Reading: ${assessment.reading}
+    - Writing: ${assessment.writing}
+    - Listening: ${assessment.listening}
+    - Speaking: ${assessment.speaking}
+    
+    Focus heavily on their weaker areas. Include specific types of exercises for each day (e.g., "Read a news article", "Write an email about a holiday"). Format as a clean Markdown list.`;
+
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+    });
+    return response.text;
 };

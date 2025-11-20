@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Page, TestResult, UserProgressData } from './types';
+import { Page, TestResult, UserProgressData, SavedQuestion } from './types';
 import B1Prep from './components/B1Prep';
 import LifeInUKPrep from './components/LifeInUKPrep';
 import Profile from './components/Profile';
@@ -57,8 +57,28 @@ const App: React.FC = () => {
         await storageService.saveProgress(updatedProgress);
       } catch (error) {
           console.error("Failed to save progress", error);
-          // Optionally revert optimistic update or show toast error
       }
+  };
+
+  const handleToggleFavorite = async (question: SavedQuestion) => {
+    if (!userProgress) return;
+
+    let updatedFavorites;
+    const exists = userProgress.favorites.some(q => q.question === question.question);
+
+    if (exists) {
+        updatedFavorites = userProgress.favorites.filter(q => q.question !== question.question);
+    } else {
+        updatedFavorites = [...userProgress.favorites, question];
+    }
+
+    const updatedProgress = {
+        ...userProgress,
+        favorites: updatedFavorites
+    };
+
+    setUserProgress(updatedProgress);
+    await storageService.saveProgress(updatedProgress);
   };
   
   const handleImportProgress = async (data: UserProgressData) => {
@@ -100,9 +120,19 @@ const App: React.FC = () => {
   const renderPage = () => {
     switch (currentPage) {
       case Page.B1:
-        return <B1Prep onSaveResult={handleSaveResult} testHistory={userProgress?.testHistory || []} />;
+        return <B1Prep 
+            onSaveResult={handleSaveResult} 
+            testHistory={userProgress?.testHistory || []}
+            favorites={userProgress?.favorites || []}
+            onToggleFavorite={handleToggleFavorite}
+        />;
       case Page.LifeInUK:
-        return <LifeInUKPrep onSaveResult={handleSaveResult} testHistory={userProgress?.testHistory || []} />;
+        return <LifeInUKPrep 
+            onSaveResult={handleSaveResult} 
+            testHistory={userProgress?.testHistory || []} 
+            favorites={userProgress?.favorites || []}
+            onToggleFavorite={handleToggleFavorite}
+        />;
       case Page.Profile:
         return <Profile 
                   userEmail={currentUserEmail} 
@@ -110,6 +140,7 @@ const App: React.FC = () => {
                   onLogout={handleLogout}
                   pointsPerLevel={POINTS_PER_LEVEL}
                   onImport={handleImportProgress}
+                  onToggleFavorite={handleToggleFavorite}
                 />;
       default:
         return <HomePage setCurrentPage={setCurrentPage} userProgress={userProgress} pointsPerLevel={POINTS_PER_LEVEL} />;
@@ -165,13 +196,18 @@ const App: React.FC = () => {
              </div>
           </header>
 
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-20 md:pb-8 relative">
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-20 md:pb-8 relative flex flex-col">
             {isLoading && (
                 <div className="absolute inset-0 bg-white/50 dark:bg-black/50 z-50 flex items-center justify-center">
                     <Spinner />
                 </div>
             )}
-            {renderPage()}
+            <div className="flex-grow">
+              {renderPage()}
+            </div>
+            <footer className="mt-12 pt-6 border-t border-gray-200 dark:border-gray-800 text-center text-sm text-gray-500 dark:text-gray-400">
+               Powered by <a href="https://github.com/ymmiah" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline font-semibold">Yasin Mohammed Miah</a>
+            </footer>
           </main>
       </div>
       

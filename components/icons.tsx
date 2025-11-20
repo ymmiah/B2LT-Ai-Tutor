@@ -1,3 +1,4 @@
+
 import React from 'react';
 import {
   Home,
@@ -22,10 +23,17 @@ import {
   BarChart,
   BadgeCheck,
   Star,
-  // FIX: Import Sun, Moon, and Laptop icons from lucide-react
   Sun,
   Moon,
   Laptop,
+  // New Icons
+  Info,
+  PenTool,
+  Headphones,
+  Calendar,
+  ClipboardList,
+  Clock,
+  Heart
 } from 'lucide-react';
 
 export const HomeIcon = (props: React.SVGProps<SVGSVGElement>) => <Home {...props} />;
@@ -51,7 +59,15 @@ export const TrendingDownIcon = (props: React.SVGProps<SVGSVGElement>) => <Trend
 export const ChartPieIcon = (props: React.SVGProps<SVGSVGElement>) => <BarChart {...props} />;
 export const BadgeCheckIcon = (props: React.SVGProps<SVGSVGElement>) => <BadgeCheck {...props} />;
 export const StarIcon = (props: React.SVGProps<SVGSVGElement>) => <Star {...props} />;
-// FIX: Export SunIcon, MoonIcon, and LaptopIcon for use in ThemeSwitcher
 export const SunIcon = (props: React.SVGProps<SVGSVGElement>) => <Sun {...props} />;
 export const MoonIcon = (props: React.SVGProps<SVGSVGElement>) => <Moon {...props} />;
 export const LaptopIcon = (props: React.SVGProps<SVGSVGElement>) => <Laptop {...props} />;
+
+// New Icons for B1 Section
+export const InfoIcon = (props: React.SVGProps<SVGSVGElement>) => <Info {...props} />;
+export const PenToolIcon = (props: React.SVGProps<SVGSVGElement>) => <PenTool {...props} />;
+export const HeadphonesIcon = (props: React.SVGProps<SVGSVGElement>) => <Headphones {...props} />;
+export const CalendarIcon = (props: React.SVGProps<SVGSVGElement>) => <Calendar {...props} />;
+export const ClipboardListIcon = (props: React.SVGProps<SVGSVGElement>) => <ClipboardList {...props} />;
+export const ClockIcon = (props: React.SVGProps<SVGSVGElement>) => <Clock {...props} />;
+export const HeartIcon = (props: React.SVGProps<SVGSVGElement>) => <Heart {...props} />;
